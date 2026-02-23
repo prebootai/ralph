@@ -20,7 +20,7 @@ cd preboot-ralph
 2) Ensure prerequisites are installed:
 - Bash
 - Node.js 18+
-- `agent` CLI in your `PATH`
+- One supported agent CLI in your `PATH`: `agent`, `codex`, or `claude`
 
 3) Make scripts executable if needed:
 

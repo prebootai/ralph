@@ -21,6 +21,7 @@ Preboot Ralph is a tiny automation wrapper that repeatedly asks an agent to comp
 
 ```text
 .
+|-- install.sh        # macOS/Linux installer for global `ralph` command
 |-- ralph.sh          # Main loop orchestrator
 `-- format-log.mjs    # JSON stream -> readable terminal formatter
 ```
@@ -29,8 +30,33 @@ Preboot Ralph is a tiny automation wrapper that repeatedly asks an agent to comp
 
 - Bash (`ralph.sh`)
 - Node.js 18+ (`format-log.mjs`)
-- `agent` CLI available in your `PATH`
+- At least one supported agent CLI in your `PATH`: `agent` (Cursor), `codex`, or `claude`
 - Git repo context (the loop prompt requires committing each completed task)
+
+## Installation (macOS/Linux)
+
+Install globally as `ralph`:
+
+```bash
+./install.sh
+```
+
+Installer behavior:
+- Supports macOS and Linux
+- Validates Node.js 18+
+- Installs both the bash entrypoint and formatter script into a writable directory already in your `PATH`
+- Prompts you to choose a default agent (`cursor`, `codex`, or `claude`)
+- Lets you target a specific `PATH` directory:
+
+```bash
+./install.sh --dir "$HOME/.local/bin"
+```
+
+Set default agent non-interactively:
+
+```bash
+./install.sh --default-agent codex
+```
 
 ## Quick Start
 
@@ -44,30 +70,56 @@ Preboot Ralph is a tiny automation wrapper that repeatedly asks an agent to comp
 - [ ] Add tests for report validation
 ```
 
-2) Run the loop:
+2) Run the loop (global install):
 
 ```bash
-./ralph.sh feature.prd.md
+ralph feature.prd.md
 ```
 
 3) Optionally cap iterations:
 
 ```bash
-./ralph.sh feature.prd.md 2
+ralph feature.prd.md 2
+```
+
+Alternative (without installing globally):
+
+```bash
+./ralph.sh feature.prd.md
 ```
 
 ## Command Reference
 
 ```bash
-./ralph.sh <prd-file> [max-iterations]
+ralph <prd-file> [max-iterations] [--agent=<cursor|codex|claude>] [--model=<model-id>]
+ralph run <prd-file> [max-iterations] [--agent=<cursor|codex|claude>] [--model=<model-id>]
+ralph set-default-agent <cursor|codex|claude>
+ralph set-default-model <model-id>
+ralph list-models
+ralph list-models --agent=cursor
+ralph help
+ralph --help
+# or
+./ralph.sh <prd-file> [max-iterations] [--agent=<cursor|codex|claude>] [--model=<model-id>]
+./ralph.sh set-default-agent <cursor|codex|claude>
+./ralph.sh set-default-model <model-id>
+./ralph.sh list-models
+./ralph.sh help
+./ralph.sh --help
 ```
 
 - `<prd-file>`: required path to a markdown PRD
 - `[max-iterations]`: optional hard cap; defaults to unchecked task count
+- `--agent=<...>`: per-run agent override (`cursor`, `codex`, or `claude`)
+- `--model=<...>`: per-run model override (model id string accepted by selected CLI)
+- `set-default-agent`: persist default agent in `~/.config/preboot-ralph/config` (or `XDG_CONFIG_HOME`)
+- `set-default-model`: persist default model in `~/.config/preboot-ralph/config` (or `XDG_CONFIG_HOME`)
+- `list-models`: print model listings from installed CLIs when available
+- `help` / `--help`: show command help and exit
 
 ## What Happens Each Iteration
 
-`ralph.sh` directs the agent to:
+`ralph.sh` directs the selected agent (`cursor`, `codex`, or `claude`) to:
 1. Read the PRD and progress file.
 2. Complete only the next unchecked task.
 3. Run `npm run check`.
@@ -76,6 +128,14 @@ Preboot Ralph is a tiny automation wrapper that repeatedly asks an agent to comp
 6. Mark the PRD task complete.
 
 It exits early when the completion sigil `<promise>COMPLETE</promise>` is detected.
+
+## Agent Model Listing Notes
+
+- `cursor`: uses native CLI model listing (`agent --list-models`)
+- `codex`: CLI currently does not expose a built-in model-list command
+- `claude`: CLI currently does not expose a built-in model-list command
+
+`ralph list-models` prints warnings for unsupported or uninstalled CLIs.
 
 ## Output Files
 
