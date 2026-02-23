@@ -5,6 +5,8 @@ COMMAND_NAME="$(basename "$0")"
 COMPLETION_SIGIL="<promise>COMPLETE</promise>"
 DEFAULT_AGENT_FALLBACK="cursor"
 DEFAULT_CURSOR_MODEL="gpt-5.3-codex-xhigh"
+INSTALL_COMMAND_NAME="ralph"
+INSTALL_FORMATTER_NAME="ralph-format-log.mjs"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/preboot-ralph"
 CONFIG_FILE="$CONFIG_DIR/config"
 
@@ -49,6 +51,7 @@ Usage:
   $COMMAND_NAME set-default-agent <cursor|codex|claude>
   $COMMAND_NAME set-default-model <model-id>
   $COMMAND_NAME list-models [--agent=<cursor|codex|claude>]
+  $COMMAND_NAME uninstall
   $COMMAND_NAME help
   $COMMAND_NAME --help
 
@@ -57,6 +60,7 @@ Commands:
   set-default-agent   Persist default agent in config
   set-default-model   Persist default model in config
   list-models         List models per agent using available CLIs
+  uninstall           Remove installed command + saved config
   help                Show this help text
 
 Examples:
@@ -65,6 +69,7 @@ Examples:
   $COMMAND_NAME set-default-agent claude
   $COMMAND_NAME set-default-model claude-sonnet-4-5-20250929
   $COMMAND_NAME list-models
+  $COMMAND_NAME uninstall
 EOF
 }
 
@@ -330,6 +335,68 @@ list_models_command() {
   list_claude_models
 }
 
+uninstall_command() {
+  local installed_command=""
+  local installed_formatter=""
+  local is_managed_install=0
+  local removed_any=0
+
+  installed_command="$(command -v "$INSTALL_COMMAND_NAME" 2>/dev/null || true)"
+  if [ -n "$installed_command" ] && [ -f "$installed_command" ]; then
+    installed_formatter="$(dirname "$installed_command")/$INSTALL_FORMATTER_NAME"
+
+    if [ -f "$installed_formatter" ]; then
+      is_managed_install=1
+    elif grep -q "Preboot Ralph" "$installed_command" 2>/dev/null; then
+      is_managed_install=1
+    fi
+
+    if [ "$is_managed_install" -eq 1 ]; then
+      if rm -f "$installed_command"; then
+        echo "Removed command: $installed_command"
+        removed_any=1
+      else
+        die "Failed to remove command: $installed_command"
+      fi
+
+      if [ -f "$installed_formatter" ]; then
+        if rm -f "$installed_formatter"; then
+          echo "Removed formatter: $installed_formatter"
+          removed_any=1
+        else
+          die "Failed to remove formatter: $installed_formatter"
+        fi
+      fi
+    else
+      warn "Found '$INSTALL_COMMAND_NAME' at $installed_command, but it does not look like a Preboot Ralph install. Skipping binary removal."
+    fi
+  else
+    warn "No '$INSTALL_COMMAND_NAME' command found in PATH."
+  fi
+
+  if [ -f "$CONFIG_FILE" ]; then
+    if rm -f "$CONFIG_FILE"; then
+      echo "Removed config: $CONFIG_FILE"
+      removed_any=1
+    else
+      die "Failed to remove config: $CONFIG_FILE"
+    fi
+  else
+    warn "No config file found at $CONFIG_FILE."
+  fi
+
+  if [ -d "$CONFIG_DIR" ]; then
+    rmdir "$CONFIG_DIR" 2>/dev/null || true
+  fi
+
+  if [ "$removed_any" -eq 0 ]; then
+    echo "Nothing to uninstall."
+    return 0
+  fi
+
+  echo "Uninstall complete."
+}
+
 run_loop() {
   local prd_file="$1"
   local max_iterations_arg="$2"
@@ -507,6 +574,21 @@ main() {
         esac
       done
       list_models_command "$selected_agent"
+      ;;
+    uninstall)
+      shift
+      for arg in "$@"; do
+        case "$arg" in
+          --help|-h)
+            echo "Usage: $COMMAND_NAME uninstall"
+            exit 0
+            ;;
+          *)
+            die "Unknown option for uninstall: $arg"
+            ;;
+        esac
+      done
+      uninstall_command
       ;;
     run)
       shift

@@ -35,10 +35,22 @@ Preboot Ralph is a tiny automation wrapper that repeatedly asks an agent to comp
 
 ## Installation (macOS/Linux)
 
-Install globally as `ralph`:
+Install globally as `ralph` from a local clone:
 
 ```bash
 ./install.sh
+```
+
+Install without cloning:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/prebootai/ralph/refs/heads/main/install.sh | bash
+```
+
+Set default agent non-interactively (works well for CI or non-interactive shells):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/prebootai/ralph/refs/heads/main/install.sh | bash -s -- --default-agent codex
 ```
 
 Installer behavior:
@@ -52,10 +64,16 @@ Installer behavior:
 ./install.sh --dir "$HOME/.local/bin"
 ```
 
-Set default agent non-interactively:
+Set default agent non-interactively (local clone):
 
 ```bash
 ./install.sh --default-agent codex
+```
+
+Uninstall globally installed binaries and saved defaults:
+
+```bash
+ralph uninstall
 ```
 
 ## Quick Start
@@ -97,6 +115,7 @@ ralph set-default-agent <cursor|codex|claude>
 ralph set-default-model <model-id>
 ralph list-models
 ralph list-models --agent=cursor
+ralph uninstall
 ralph help
 ralph --help
 # or
@@ -104,6 +123,7 @@ ralph --help
 ./ralph.sh set-default-agent <cursor|codex|claude>
 ./ralph.sh set-default-model <model-id>
 ./ralph.sh list-models
+./ralph.sh uninstall
 ./ralph.sh help
 ./ralph.sh --help
 ```
@@ -115,6 +135,7 @@ ralph --help
 - `set-default-agent`: persist default agent in `~/.config/preboot-ralph/config` (or `XDG_CONFIG_HOME`)
 - `set-default-model`: persist default model in `~/.config/preboot-ralph/config` (or `XDG_CONFIG_HOME`)
 - `list-models`: print model listings from installed CLIs when available
+- `uninstall`: remove installed `ralph` + `ralph-format-log.mjs` and delete saved config
 - `help` / `--help`: show command help and exit
 
 ## What Happens Each Iteration

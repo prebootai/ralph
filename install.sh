@@ -5,8 +5,13 @@ MIN_NODE_MAJOR=18
 INSTALL_COMMAND_NAME="ralph"
 INSTALL_FORMATTER_NAME="ralph-format-log.mjs"
 DEFAULT_AGENT_FALLBACK="cursor"
+REMOTE_REPO_OWNER="${PREBOOT_RALPH_REPO_OWNER:-prebootai}"
+REMOTE_REPO_NAME="${PREBOOT_RALPH_REPO_NAME:-ralph}"
+REMOTE_REF="${PREBOOT_RALPH_REF:-main}"
+REMOTE_RAW_BASE="${PREBOOT_RALPH_RAW_BASE:-https://raw.githubusercontent.com/${REMOTE_REPO_OWNER}/${REMOTE_REPO_NAME}/${REMOTE_REF}}"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/preboot-ralph"
 CONFIG_FILE="$CONFIG_DIR/config"
+TEMP_SOURCE_DIR=""
 
 if [[ -t 1 ]]; then
   BOLD="$(printf '\033[1m')"
@@ -46,6 +51,13 @@ die() {
   log_error "$1"
   exit 1
 }
+
+cleanup_temp_source_dir() {
+  if [[ -n "${TEMP_SOURCE_DIR:-}" && -d "$TEMP_SOURCE_DIR" ]]; then
+    rm -rf "$TEMP_SOURCE_DIR"
+  fi
+}
+trap cleanup_temp_source_dir EXIT
 
 usage() {
   cat <<'EOF'
@@ -164,18 +176,20 @@ prompt_for_default_agent() {
   local suggested="$1"
   local response=""
 
-  if [[ ! -t 0 ]]; then
-    printf "%s" "$suggested"
-    return 0
-  fi
-
   printf "\n" >&2
   log_step "Choose a default agent" >&2
   printf "  1) cursor  [%s]\n" "$(agent_status_label cursor)" >&2
   printf "  2) codex   [%s]\n" "$(agent_status_label codex)" >&2
   printf "  3) claude  [%s]\n" "$(agent_status_label claude)" >&2
   printf "Press Enter for default [%s]: " "$suggested" >&2
-  read -r response
+  if [[ -t 0 ]]; then
+    read -r response
+  elif [[ -r /dev/tty ]]; then
+    read -r response < /dev/tty
+  else
+    printf "%s" "$suggested"
+    return 0
+  fi
 
   case "$response" in
     "" ) printf "%s" "$suggested" ;;
@@ -197,6 +211,51 @@ write_defaults_config() {
     printf "DEFAULT_AGENT=%q\n" "$default_agent"
     printf "DEFAULT_MODEL=%q\n" "$default_model"
   } > "$CONFIG_FILE"
+}
+
+download_file() {
+  local url="$1"
+  local dest="$2"
+  if command -v curl >/dev/null 2>&1; then
+    curl --fail --silent --show-error --location "$url" --output "$dest"
+  elif command -v wget >/dev/null 2>&1; then
+    wget --quiet --output-document="$dest" "$url"
+  else
+    die "Missing downloader. Install curl or wget and rerun."
+  fi
+}
+
+resolve_source_file() {
+  local script_source="${BASH_SOURCE[0]:-}"
+  local script_dir=""
+  local remote_ralph_url="$REMOTE_RAW_BASE/ralph.sh"
+  local remote_formatter_url="$REMOTE_RAW_BASE/format-log.mjs"
+
+  if [[ -n "$script_source" ]]; then
+    script_dir="$(cd "$(dirname "$script_source")" && pwd)"
+  else
+    script_dir="$(pwd)"
+  fi
+
+  SOURCE_RALPH="$script_dir/ralph.sh"
+  SOURCE_FORMATTER="$script_dir/format-log.mjs"
+  if [[ -f "$SOURCE_RALPH" && -f "$SOURCE_FORMATTER" ]]; then
+    return 0
+  fi
+
+  log_step "Fetching installer payload"
+  TEMP_SOURCE_DIR="$(mktemp -d)"
+  SOURCE_RALPH="$TEMP_SOURCE_DIR/ralph.sh"
+  SOURCE_FORMATTER="$TEMP_SOURCE_DIR/format-log.mjs"
+
+  if ! download_file "$remote_ralph_url" "$SOURCE_RALPH"; then
+    die "Failed to download: $remote_ralph_url"
+  fi
+  if ! download_file "$remote_formatter_url" "$SOURCE_FORMATTER"; then
+    die "Failed to download: $remote_formatter_url"
+  fi
+  chmod 0755 "$SOURCE_RALPH" "$SOURCE_FORMATTER"
+  log_ok "Fetched scripts from: $REMOTE_RAW_BASE"
 }
 
 TARGET_DIR=""
@@ -227,12 +286,9 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_RALPH="$SCRIPT_DIR/ralph.sh"
-SOURCE_FORMATTER="$SCRIPT_DIR/format-log.mjs"
-
-[[ -f "$SOURCE_RALPH" ]] || die "Missing source script: $SOURCE_RALPH"
-[[ -f "$SOURCE_FORMATTER" ]] || die "Missing formatter script: $SOURCE_FORMATTER"
+SOURCE_RALPH=""
+SOURCE_FORMATTER=""
+resolve_source_file
 
 printf "%bPreboot Ralph Installer%b\n" "$BOLD" "$RESET"
 printf "%bInstalls ralph + formatter into your PATH.%b\n\n" "$DIM" "$RESET"
@@ -337,3 +393,4 @@ printf "Run: %b%s <prd-file> [max-iterations]%b\n" "$BOLD" "$INSTALL_COMMAND_NAM
 printf "Defaults:\n"
 printf "  %b%s set-default-agent <cursor|codex|claude>%b\n" "$BOLD" "$INSTALL_COMMAND_NAME" "$RESET"
 printf "  %b%s set-default-model <model-id>%b\n" "$BOLD" "$INSTALL_COMMAND_NAME" "$RESET"
+printf "  %b%s uninstall%b\n" "$BOLD" "$INSTALL_COMMAND_NAME" "$RESET"
