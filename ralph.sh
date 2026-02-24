@@ -182,8 +182,7 @@ EOF
 run_cursor_iteration() {
   local prompt="$1"
   local model="$2"
-  local log_file="$3"
-  local iteration_output="$4"
+  local iteration_output="$3"
   local -a cmd
 
   [ -n "$FORMATTER" ] || die "Formatter script not found. Expected $FORMATTER_DEFAULT or $FORMATTER_INSTALLED."
@@ -203,14 +202,13 @@ run_cursor_iteration() {
   fi
 
   cmd+=("$prompt")
-  "${cmd[@]}" 2>&1 | tee -a "$log_file" "$iteration_output" | node "$FORMATTER"
+  "${cmd[@]}" 2>&1 | tee "$iteration_output" | node "$FORMATTER"
 }
 
 run_codex_iteration() {
   local prompt="$1"
   local model="$2"
-  local log_file="$3"
-  local iteration_output="$4"
+  local iteration_output="$3"
   local -a cmd
 
   cmd=(
@@ -225,14 +223,13 @@ run_codex_iteration() {
   fi
 
   cmd+=("-")
-  printf "%s\n" "$prompt" | "${cmd[@]}" 2>&1 | tee -a "$log_file" "$iteration_output"
+  printf "%s\n" "$prompt" | "${cmd[@]}" 2>&1 | tee "$iteration_output"
 }
 
 run_claude_iteration() {
   local prompt="$1"
   local model="$2"
-  local log_file="$3"
-  local iteration_output="$4"
+  local iteration_output="$3"
   local -a cmd
 
   cmd=(
@@ -248,20 +245,19 @@ run_claude_iteration() {
   fi
 
   cmd+=("$prompt")
-  "${cmd[@]}" 2>&1 | tee -a "$log_file" "$iteration_output"
+  "${cmd[@]}" 2>&1 | tee "$iteration_output"
 }
 
 run_agent_iteration() {
   local selected_agent="$1"
   local prompt="$2"
   local model="$3"
-  local log_file="$4"
-  local iteration_output="$5"
+  local iteration_output="$4"
 
   case "$selected_agent" in
-    cursor) run_cursor_iteration "$prompt" "$model" "$log_file" "$iteration_output" ;;
-    codex) run_codex_iteration "$prompt" "$model" "$log_file" "$iteration_output" ;;
-    claude) run_claude_iteration "$prompt" "$model" "$log_file" "$iteration_output" ;;
+    cursor) run_cursor_iteration "$prompt" "$model" "$iteration_output" ;;
+    codex) run_codex_iteration "$prompt" "$model" "$iteration_output" ;;
+    claude) run_claude_iteration "$prompt" "$model" "$iteration_output" ;;
     *) die "Unsupported agent '$selected_agent'." ;;
   esac
 }
@@ -403,7 +399,6 @@ run_loop() {
   local selected_agent="$3"
   local selected_model="$4"
   local progress_file
-  local log_file
   local task_count
   local max_iterations
   local iteration_output
@@ -415,7 +410,6 @@ run_loop() {
   fi
 
   progress_file="${prd_file%.md}.progress.txt"
-  log_file="${prd_file%.md}.log"
   task_count="$(grep -c '^\- \[ \]' "$prd_file" || true)"
   max_iterations="${max_iterations_arg:-$task_count}"
 
@@ -428,12 +422,10 @@ run_loop() {
   fi
 
   touch "$progress_file"
-  : > "$log_file"
 
   echo "=== Preboot Ralph ==="
   echo "PRD:            $prd_file"
   echo "Progress:       $progress_file"
-  echo "Log:            $log_file"
   echo "Tasks found:    $task_count"
   echo "Max iterations: $max_iterations"
   echo "Agent:          $selected_agent"
@@ -443,24 +435,11 @@ run_loop() {
   for ((i = 1; i <= max_iterations; i++)); do
     echo "--- Iteration $i of $max_iterations ---"
 
-    {
-      echo "========================================"
-      echo "ITERATION $i of $max_iterations"
-      echo "STARTED: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-      echo "========================================"
-    } >> "$log_file"
-
     prompt="$(build_iteration_prompt "$prd_file" "$progress_file")"
     iteration_output="$(mktemp -t preboot-ralph-iteration.XXXXXX)"
     TMP_FILES+=("$iteration_output")
 
-    run_agent_iteration "$selected_agent" "$prompt" "$selected_model" "$log_file" "$iteration_output"
-
-    {
-      echo ""
-      echo "ENDED: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-      echo ""
-    } >> "$log_file"
+    run_agent_iteration "$selected_agent" "$prompt" "$selected_model" "$iteration_output"
 
     echo ""
 
