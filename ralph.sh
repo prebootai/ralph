@@ -7,6 +7,7 @@ DEFAULT_AGENT_FALLBACK="cursor"
 DEFAULT_CURSOR_MODEL="gpt-5.3-codex-xhigh"
 INSTALL_COMMAND_NAME="ralph"
 INSTALL_FORMATTER_NAME="ralph-format-log.mjs"
+INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/prebootai/ralph/refs/heads/main/install.sh"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/preboot-ralph"
 CONFIG_FILE="$CONFIG_DIR/config"
 
@@ -52,6 +53,7 @@ Usage:
   $COMMAND_NAME set-default-model <model-id>
   $COMMAND_NAME list-models [--agent=<cursor|codex|claude>]
   $COMMAND_NAME uninstall
+  $COMMAND_NAME update
   $COMMAND_NAME help
   $COMMAND_NAME --help
 
@@ -61,6 +63,7 @@ Commands:
   set-default-model   Persist default model in config
   list-models         List models per agent using available CLIs
   uninstall           Remove installed command + saved config
+  update              Reinstall Preboot Ralph from latest install script
   help                Show this help text
 
 Examples:
@@ -70,6 +73,7 @@ Examples:
   $COMMAND_NAME set-default-model claude-sonnet-4-5-20250929
   $COMMAND_NAME list-models
   $COMMAND_NAME uninstall
+  $COMMAND_NAME update
 EOF
 }
 
@@ -170,7 +174,7 @@ Rules:
 - Read the PRD and the progress file.
 - Find the NEXT incomplete task (unchecked checkbox).
 - Implement that ONE task fully. Do not skip ahead.
-- Run npm run check from the project root after making changes.
+- Run tests and typechecks check after making changes BEFORE commiting your changes.
 - Commit your changes with a descriptive message.
 - Append a single line to $progress_file summarizing what you completed and the current date/time.
 - Mark the task as complete in the PRD by changing [ ] to [x].
@@ -393,6 +397,13 @@ uninstall_command() {
   echo "Uninstall complete."
 }
 
+update_command() {
+  uninstall_command
+  echo "Reinstalling Preboot Ralph..."
+  curl -fsSL "$INSTALL_SCRIPT_URL" | bash
+  echo "Update complete."
+}
+
 run_loop() {
   local prd_file="$1"
   local max_iterations_arg="$2"
@@ -568,6 +579,21 @@ main() {
         esac
       done
       uninstall_command
+      ;;
+    update)
+      shift
+      for arg in "$@"; do
+        case "$arg" in
+          --help|-h)
+            echo "Usage: $COMMAND_NAME update"
+            exit 0
+            ;;
+          *)
+            die "Unknown option for update: $arg"
+            ;;
+        esac
+      done
+      update_command
       ;;
     run)
       shift
