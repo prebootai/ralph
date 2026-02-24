@@ -15,6 +15,7 @@ Preboot Ralph is a tiny automation wrapper that repeatedly asks an agent to comp
 - Enforces strict single-task execution (`- [ ]` -> `- [x]`)
 - Produces readable live logs from streamed JSON events
 - Keeps a persistent progress journal per PRD
+- Supports manual checkpoints via markdown separator lines (`---`)
 - Stops automatically when all PRD tasks are complete
 
 ## Repository
@@ -170,6 +171,7 @@ For `feature.prd.md`, Preboot Ralph writes:
 - Use implementation-focused wording.
 - Avoid bundling multiple deliverables in a single item.
 - Use exact syntax: `- [ ] Task description`.
+- Use a standalone `---` line as a checkpoint barrier; Ralph stops before tasks below it.
 
 ## Readable Log Stream
 

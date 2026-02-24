@@ -163,6 +163,20 @@ require_agent_cli() {
   fi
 }
 
+count_incomplete_tasks() {
+  local prd_file="$1"
+  grep -c '^\- \[ \]' "$prd_file" || true
+}
+
+count_incomplete_tasks_before_checkpoint() {
+  local prd_file="$1"
+  awk '
+    /^[[:space:]]*---[[:space:]]*$/ { exit }
+    /^\- \[ \]/ { count++ }
+    END { print count + 0 }
+  ' "$prd_file"
+}
+
 build_iteration_prompt() {
   local prd_file="$1"
   local progress_file="$2"
@@ -173,6 +187,7 @@ You are executing a Preboot Ralph loop on this PRD.
 Rules:
 - Read the PRD and the progress file.
 - Find the NEXT incomplete task (unchecked checkbox).
+- Treat a line containing only --- as a hard checkpoint separator; do not work on tasks below the first separator.
 - Implement that ONE task fully. Do not skip ahead.
 - Run tests and typechecks check after making changes BEFORE commiting your changes.
 - Commit your changes with a descriptive message.
@@ -411,6 +426,9 @@ run_loop() {
   local selected_model="$4"
   local progress_file
   local task_count
+  local checkpoint_task_count
+  local tasks_remaining
+  local total_remaining
   local max_iterations
   local iteration_output
   local prompt
@@ -421,15 +439,25 @@ run_loop() {
   fi
 
   progress_file="${prd_file%.md}.progress.txt"
-  task_count="$(grep -c '^\- \[ \]' "$prd_file" || true)"
-  max_iterations="${max_iterations_arg:-$task_count}"
+  task_count="$(count_incomplete_tasks "$prd_file")"
+  checkpoint_task_count="$(count_incomplete_tasks_before_checkpoint "$prd_file")"
+  max_iterations="${max_iterations_arg:-$checkpoint_task_count}"
+
+  if [ "$task_count" -eq 0 ]; then
+    die "No incomplete tasks found in $prd_file"
+  fi
+
+  if [ "$checkpoint_task_count" -eq 0 ]; then
+    echo "=== Reached checkpoint separator (---) before the next incomplete task. Review work and move/remove the separator to continue. ==="
+    return 0
+  fi
 
   if ! [[ "$max_iterations" =~ ^[0-9]+$ ]]; then
     die "max-iterations must be a positive integer."
   fi
 
   if [ "$max_iterations" -eq 0 ]; then
-    die "No incomplete tasks found in $prd_file"
+    die "No incomplete tasks found before checkpoint separator (---) in $prd_file"
   fi
 
   touch "$progress_file"
@@ -438,12 +466,26 @@ run_loop() {
   echo "PRD:            $prd_file"
   echo "Progress:       $progress_file"
   echo "Tasks found:    $task_count"
+  if [ "$checkpoint_task_count" -lt "$task_count" ]; then
+    echo "Tasks before checkpoint: $checkpoint_task_count"
+  fi
   echo "Max iterations: $max_iterations"
   echo "Agent:          $selected_agent"
   echo "Model:          ${selected_model:-<agent default>}"
   echo ""
 
   for ((i = 1; i <= max_iterations; i++)); do
+    tasks_remaining="$(count_incomplete_tasks_before_checkpoint "$prd_file")"
+    if [ "$tasks_remaining" -eq 0 ]; then
+      total_remaining="$(count_incomplete_tasks "$prd_file")"
+      if [ "$total_remaining" -eq 0 ]; then
+        echo "=== PRD complete after $((i - 1)) iteration(s). ==="
+      else
+        echo "=== Reached checkpoint separator (---). Stopping for review with $total_remaining unchecked task(s) after the checkpoint. ==="
+      fi
+      return 0
+    fi
+
     echo "--- Iteration $i of $max_iterations ---"
 
     prompt="$(build_iteration_prompt "$prd_file" "$progress_file")"
