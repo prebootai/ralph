@@ -42,6 +42,63 @@ die() {
   exit 1
 }
 
+play_notification_sound() {
+  local os_name
+  os_name="$(uname -s 2>/dev/null || true)"
+
+  case "$os_name" in
+    Darwin)
+      if command -v afplay >/dev/null 2>&1; then
+        afplay "/System/Library/Sounds/Glass.aiff" 2>/dev/null || true
+      fi
+      ;;
+    Linux)
+      if command -v paplay >/dev/null 2>&1; then
+        paplay --volume=65536 /usr/share/sounds/freedesktop/stereo/bell.oga 2>/dev/null || true
+      elif command -v aplay >/dev/null 2>&1; then
+        aplay -q /usr/share/sounds/alsa/Front_Left.wav 2>/dev/null || true
+      if command -v canberra-gtk-play >/dev/null 2>&1; then
+          canberra-gtk-play --volume=1.0 --message="ralph-notification" 2>/dev/null || true
+        fi
+      fi
+      ;;
+  esac
+}
+
+send_native_notification() {
+  local title="$1"
+  local message="$2"
+  local os_name
+
+  os_name="$(uname -s 2>/dev/null || true)"
+
+  case "$os_name" in
+    Darwin)
+      if command -v osascript >/dev/null 2>&1; then
+        osascript \
+          -e 'on run argv' \
+          -e 'display notification (item 2 of argv) with title (item 1 of argv) sound name "Glass"' \
+          -e 'end run' \
+          "$title" "$message" >/dev/null 2>&1 || true
+      fi
+      ;;
+    Linux)
+      if command -v notify-send >/dev/null 2>&1; then
+        notify-send --urgency=normal "$title" "$message" >/dev/null 2>&1 || true
+      fi
+      ;;
+  esac
+
+  play_notification_sound
+}
+
+notify_checkpoint_reached() {
+  local prd_file="$1"
+  local detail="$2"
+
+  send_native_notification "Preboot Ralph checkpoint reached" "$detail ($prd_file)"
+}
+
 show_help() {
   cat <<EOF
 Preboot Ralph
@@ -449,6 +506,7 @@ run_loop() {
 
   if [ "$checkpoint_task_count" -eq 0 ]; then
     echo "=== Reached checkpoint separator (---) before the next incomplete task. Review work and move/remove the separator to continue. ==="
+    notify_checkpoint_reached "$prd_file" "Checkpoint reached before the next incomplete task"
     return 0
   fi
 
@@ -482,6 +540,7 @@ run_loop() {
         echo "=== PRD complete after $((i - 1)) iteration(s). ==="
       else
         echo "=== Reached checkpoint separator (---). Stopping for review with $total_remaining unchecked task(s) after the checkpoint. ==="
+        notify_checkpoint_reached "$prd_file" "Stopping with $total_remaining unchecked task(s) after checkpoint"
       fi
       return 0
     fi

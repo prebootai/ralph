@@ -16,6 +16,7 @@ Preboot Ralph is a tiny automation wrapper that repeatedly asks an agent to comp
 - Produces readable live logs from streamed JSON events
 - Keeps a persistent progress journal per PRD
 - Supports manual checkpoints via markdown separator lines (`---`)
+- Sends native desktop notifications when checkpoint separators are reached
 - Stops automatically when all PRD tasks are complete
 
 ## Repository
@@ -32,6 +33,7 @@ Preboot Ralph is a tiny automation wrapper that repeatedly asks an agent to comp
 - Bash (`ralph.sh`)
 - Node.js 18+ (`format-log.mjs`)
 - At least one supported agent CLI in your `PATH`: `agent` (Cursor), `codex`, or `claude`
+- Optional for Linux notifications: `notify-send` (typically provided by `libnotify`)
 - Git repo context (the loop prompt requires committing each completed task)
 
 ## Installation (macOS/Linux)
