@@ -104,11 +104,11 @@ show_help() {
 Preboot Ralph
 
 Usage:
-  $COMMAND_NAME <prd-file> [max-iterations] [--agent=<cursor|codex|claude>] [--model=<model-id>]
-  $COMMAND_NAME run <prd-file> [max-iterations] [--agent=<cursor|codex|claude>] [--model=<model-id>]
-  $COMMAND_NAME set-default-agent <cursor|codex|claude>
+  $COMMAND_NAME <prd-file> [max-iterations] [--agent=<cursor|codex|claude|opencode>] [--model=<model-id>]
+  $COMMAND_NAME run <prd-file> [max-iterations] [--agent=<cursor|codex|claude|opencode>] [--model=<model-id>]
+  $COMMAND_NAME set-default-agent <cursor|codex|claude|opencode>
   $COMMAND_NAME set-default-model <model-id>
-  $COMMAND_NAME list-models [--agent=<cursor|codex|claude>]
+  $COMMAND_NAME list-models [--agent=<cursor|codex|claude|opencode>]
   $COMMAND_NAME uninstall
   $COMMAND_NAME update
   $COMMAND_NAME help
@@ -136,7 +136,7 @@ EOF
 
 is_valid_agent() {
   case "$1" in
-    cursor|codex|claude) return 0 ;;
+    cursor|codex|claude|opencode) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -146,6 +146,7 @@ agent_cli_name() {
     cursor) echo "agent" ;;
     codex) echo "codex" ;;
     claude) echo "claude" ;;
+    opencode) echo "opencode" ;;
     *) echo "" ;;
   esac
 }
@@ -185,7 +186,7 @@ set_default_agent_command() {
   load_config
 
   if ! is_valid_agent "$new_agent"; then
-    die "Invalid agent '$new_agent'. Allowed: cursor, codex, claude."
+    die "Invalid agent '$new_agent'. Allowed: cursor, codex, claude, opencode."
   fi
 
   DEFAULT_AGENT="$new_agent"
@@ -324,6 +325,26 @@ run_claude_iteration() {
   "${cmd[@]}" 2>&1 | tee "$iteration_output"
 }
 
+run_opencode_iteration() {
+  local prompt="$1"
+  local model="$2"
+  local iteration_output="$3"
+  local -a cmd
+
+  cmd=(
+    opencode
+    run
+    --agent build
+  )
+
+  if [ -n "$model" ]; then
+    cmd+=(--model "$model")
+  fi
+
+  cmd+=("$prompt")
+  "${cmd[@]}" 2>&1 | tee "$iteration_output"
+}
+
 run_agent_iteration() {
   local selected_agent="$1"
   local prompt="$2"
@@ -334,6 +355,7 @@ run_agent_iteration() {
     cursor) run_cursor_iteration "$prompt" "$model" "$iteration_output" ;;
     codex) run_codex_iteration "$prompt" "$model" "$iteration_output" ;;
     claude) run_claude_iteration "$prompt" "$model" "$iteration_output" ;;
+    opencode) run_opencode_iteration "$prompt" "$model" "$iteration_output" ;;
     *) die "Unsupported agent '$selected_agent'." ;;
   esac
 }
@@ -380,11 +402,22 @@ list_claude_models() {
   echo "Use: claude -p --model <model-id> \"<prompt>\""
 }
 
+list_opencode_models() {
+  if ! command -v opencode >/dev/null 2>&1; then
+    warn "opencode: 'opencode' CLI is not installed."
+    return 0
+  fi
+
+  if ! opencode models; then
+    warn "opencode: failed to list models from 'opencode'."
+  fi
+}
+
 list_models_command() {
   local selected_agent="${1:-}"
 
   if [ -n "$selected_agent" ] && ! is_valid_agent "$selected_agent"; then
-    die "Invalid --agent value '$selected_agent'. Allowed: cursor, codex, claude."
+    die "Invalid --agent value '$selected_agent'. Allowed: cursor, codex, claude, opencode."
   fi
 
   if [ -n "$selected_agent" ]; then
@@ -393,6 +426,7 @@ list_models_command() {
       cursor) list_cursor_models ;;
       codex) list_codex_models ;;
       claude) list_claude_models ;;
+      opencode) list_opencode_models ;;
     esac
     return 0
   fi
@@ -405,6 +439,9 @@ list_models_command() {
   echo ""
   echo "=== Models: claude ==="
   list_claude_models
+  echo ""
+  echo "=== Models: opencode ==="
+  list_opencode_models
 }
 
 uninstall_command() {
@@ -619,7 +656,7 @@ run_command() {
   selected_model="${override_model:-$DEFAULT_MODEL}"
 
   if ! is_valid_agent "$selected_agent"; then
-    die "Invalid agent '$selected_agent'. Allowed: cursor, codex, claude."
+    die "Invalid agent '$selected_agent'. Allowed: cursor, codex, claude, opencode."
   fi
 
   if [ "$selected_agent" = "cursor" ] && [ -z "$selected_model" ]; then
@@ -642,7 +679,7 @@ main() {
       ;;
     set-default-agent)
       shift
-      [ -n "${1:-}" ] || die "Usage: $COMMAND_NAME set-default-agent <cursor|codex|claude>"
+      [ -n "${1:-}" ] || die "Usage: $COMMAND_NAME set-default-agent <cursor|codex|claude|opencode>"
       set_default_agent_command "$1"
       ;;
     set-default-model)
@@ -656,7 +693,7 @@ main() {
         case "$arg" in
           --agent=*) selected_agent="${arg#--agent=}" ;;
           --help|-h)
-            echo "Usage: $COMMAND_NAME list-models [--agent=<cursor|codex|claude>]"
+            echo "Usage: $COMMAND_NAME list-models [--agent=<cursor|codex|claude|opencode>]"
             exit 0
             ;;
           *)

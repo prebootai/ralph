@@ -32,7 +32,7 @@ Preboot Ralph is a tiny automation wrapper that repeatedly asks an agent to comp
 
 - Bash (`ralph.sh`)
 - Node.js 18+ (`format-log.mjs`)
-- At least one supported agent CLI in your `PATH`: `agent` (Cursor), `codex`, or `claude`
+- At least one supported agent CLI in your `PATH`: `agent` (Cursor), `codex`, `claude`, or `opencode`
 - Optional for Linux notifications: `notify-send` (typically provided by `libnotify`)
 - Git repo context (the loop prompt requires committing each completed task)
 
@@ -60,7 +60,7 @@ Installer behavior:
 - Supports macOS and Linux
 - Validates Node.js 18+
 - Installs both the bash entrypoint and formatter script into a writable directory already in your `PATH`
-- Prompts you to choose a default agent (`cursor`, `codex`, or `claude`)
+- Prompts you to choose a default agent (`cursor`, `codex`, `claude`, or `opencode`)
 - Lets you target a specific `PATH` directory:
 
 ```bash
@@ -112,18 +112,18 @@ Alternative (without installing globally):
 ## Command Reference
 
 ```bash
-ralph <prd-file> [max-iterations] [--agent=<cursor|codex|claude>] [--model=<model-id>]
-ralph run <prd-file> [max-iterations] [--agent=<cursor|codex|claude>] [--model=<model-id>]
-ralph set-default-agent <cursor|codex|claude>
+ralph <prd-file> [max-iterations] [--agent=<cursor|codex|claude|opencode>] [--model=<model-id>]
+ralph run <prd-file> [max-iterations] [--agent=<cursor|codex|claude|opencode>] [--model=<model-id>]
+ralph set-default-agent <cursor|codex|claude|opencode>
 ralph set-default-model <model-id>
 ralph list-models
-ralph list-models --agent=cursor
+ralph list-models --agent=opencode
 ralph uninstall
 ralph help
 ralph --help
 # or
-./ralph.sh <prd-file> [max-iterations] [--agent=<cursor|codex|claude>] [--model=<model-id>]
-./ralph.sh set-default-agent <cursor|codex|claude>
+./ralph.sh <prd-file> [max-iterations] [--agent=<cursor|codex|claude|opencode>] [--model=<model-id>]
+./ralph.sh set-default-agent <cursor|codex|claude|opencode>
 ./ralph.sh set-default-model <model-id>
 ./ralph.sh list-models
 ./ralph.sh uninstall
@@ -133,7 +133,7 @@ ralph --help
 
 - `<prd-file>`: required path to a markdown PRD
 - `[max-iterations]`: optional hard cap; defaults to unchecked task count
-- `--agent=<...>`: per-run agent override (`cursor`, `codex`, or `claude`)
+- `--agent=<...>`: per-run agent override (`cursor`, `codex`, `claude`, or `opencode`)
 - `--model=<...>`: per-run model override (model id string accepted by selected CLI)
 - `set-default-agent`: persist default agent in `~/.config/preboot-ralph/config` (or `XDG_CONFIG_HOME`)
 - `set-default-model`: persist default model in `~/.config/preboot-ralph/config` (or `XDG_CONFIG_HOME`)
@@ -143,7 +143,7 @@ ralph --help
 
 ## What Happens Each Iteration
 
-`ralph.sh` directs the selected agent (`cursor`, `codex`, or `claude`) to:
+`ralph.sh` directs the selected agent (`cursor`, `codex`, `claude`, or `opencode`) to:
 1. Read the PRD and progress file.
 2. Complete only the next unchecked task.
 3. Run `npm run check`.
@@ -158,6 +158,7 @@ It exits early when the completion sigil `<promise>COMPLETE</promise>` is detect
 - `cursor`: uses native CLI model listing (`agent --list-models`)
 - `codex`: CLI currently does not expose a built-in model-list command
 - `claude`: CLI currently does not expose a built-in model-list command
+- `opencode`: uses native CLI model listing (`opencode models`)
 
 `ralph list-models` prints warnings for unsupported or uninstalled CLIs.
 

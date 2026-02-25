@@ -64,11 +64,11 @@ usage() {
 Install Preboot Ralph as a global `ralph` command.
 
 Usage:
-  ./install.sh [--dir <path>] [--default-agent <cursor|codex|claude>]
+  ./install.sh [--dir <path>] [--default-agent <cursor|codex|claude|opencode>]
 
 Options:
-  --dir <path>                Install into this existing directory (must already be in PATH)
-  --default-agent <agent>     Set default agent without interactive prompt
+  --dir <path>                  Install into this existing directory (must already be in PATH)
+  --default-agent <agent>       Set default agent without interactive prompt (cursor|codex|claude|opencode)
   -h, --help                  Show this help text
 EOF
 }
@@ -136,7 +136,7 @@ choose_writable_path_dir() {
 
 is_valid_agent() {
   case "$1" in
-    cursor|codex|claude) return 0 ;;
+    cursor|codex|claude|opencode) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -146,6 +146,7 @@ agent_cli_name() {
     cursor) echo "agent" ;;
     codex) echo "codex" ;;
     claude) echo "claude" ;;
+    opencode) echo "opencode" ;;
     *) echo "" ;;
   esac
 }
@@ -163,7 +164,7 @@ agent_status_label() {
 
 detect_default_agent() {
   local candidate
-  for candidate in cursor codex claude; do
+  for candidate in cursor codex claude opencode; do
     if command -v "$(agent_cli_name "$candidate")" >/dev/null 2>&1; then
       printf "%s" "$candidate"
       return 0
@@ -178,9 +179,10 @@ prompt_for_default_agent() {
 
   printf "\n" >&2
   log_step "Choose a default agent" >&2
-  printf "  1) cursor  [%s]\n" "$(agent_status_label cursor)" >&2
-  printf "  2) codex   [%s]\n" "$(agent_status_label codex)" >&2
-  printf "  3) claude  [%s]\n" "$(agent_status_label claude)" >&2
+  printf "  1) cursor    [%s]\n" "$(agent_status_label cursor)" >&2
+  printf "  2) codex     [%s]\n" "$(agent_status_label codex)" >&2
+  printf "  3) claude    [%s]\n" "$(agent_status_label claude)" >&2
+  printf "  4) opencode  [%s]\n" "$(agent_status_label opencode)" >&2
   printf "Press Enter for default [%s]: " "$suggested" >&2
   if [[ -t 0 ]]; then
     read -r response
@@ -196,6 +198,7 @@ prompt_for_default_agent() {
     1|cursor) printf "cursor" ;;
     2|codex) printf "codex" ;;
     3|claude) printf "claude" ;;
+    4|opencode) printf "opencode" ;;
     *)
       log_warn "Invalid selection '$response'; using '$suggested'." >&2
       printf "%s" "$suggested"
@@ -374,7 +377,7 @@ fi
 
 if ! command -v "$(agent_cli_name "$CHOSEN_DEFAULT_AGENT")" >/dev/null 2>&1; then
   log_warn "Selected default agent '$CHOSEN_DEFAULT_AGENT' is not currently installed."
-  log_warn "You can change it later using: ralph set-default-agent <cursor|codex|claude>"
+  log_warn "You can change it later using: ralph set-default-agent <cursor|codex|claude|opencode>"
 fi
 
 write_defaults_config "$CHOSEN_DEFAULT_AGENT" "$SAVED_DEFAULT_MODEL"
@@ -391,6 +394,6 @@ fi
 printf "\n%bInstall complete.%b\n" "$GREEN$BOLD" "$RESET"
 printf "Run: %b%s <prd-file> [max-iterations]%b\n" "$BOLD" "$INSTALL_COMMAND_NAME" "$RESET"
 printf "Defaults:\n"
-printf "  %b%s set-default-agent <cursor|codex|claude>%b\n" "$BOLD" "$INSTALL_COMMAND_NAME" "$RESET"
+printf "  %b%s set-default-agent <cursor|codex|claude|opencode>%b\n" "$BOLD" "$INSTALL_COMMAND_NAME" "$RESET"
 printf "  %b%s set-default-model <model-id>%b\n" "$BOLD" "$INSTALL_COMMAND_NAME" "$RESET"
 printf "  %b%s uninstall%b\n" "$BOLD" "$INSTALL_COMMAND_NAME" "$RESET"
